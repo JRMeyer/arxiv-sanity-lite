@@ -44,7 +44,8 @@ const Paper = props => {
         <div class='rel_tags'>{p.tags}</div>
         {utag_controls}
         {thumb_img}
-        <div class='rel_abs'>{p.summary}</div>
+            <div class='rel_abs'>{p.summary}</div>
+	    <figure><audio controls src={p.audio_path} type="audio/wav"></audio></figure>
         <div class='rel_more'><a href={similar_url}>similar</a></div>
         <div class='rel_inspect'><a href={inspect_url}>inspect</a></div>
     </div>

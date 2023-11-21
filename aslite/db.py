@@ -104,27 +104,27 @@ PAPERS_DB_FILE = os.path.join(DATA_DIR, 'papers.db')
 # stores account-relevant info, like which tags exist for which papers
 DICT_DB_FILE = os.path.join(DATA_DIR, 'dict.db')
 
-def get_papers_db(flag='r', autocommit=True):
+def get_papers_db(flag='c', autocommit=True):
     assert flag in ['r', 'c']
     pdb = CompressedSqliteDict(PAPERS_DB_FILE, tablename='papers', flag=flag, autocommit=autocommit)
     return pdb
 
-def get_metas_db(flag='r', autocommit=True):
+def get_metas_db(flag='c', autocommit=True):
     assert flag in ['r', 'c']
     mdb = SqliteDict(PAPERS_DB_FILE, tablename='metas', flag=flag, autocommit=autocommit)
     return mdb
 
-def get_tags_db(flag='r', autocommit=True):
+def get_tags_db(flag='c', autocommit=True):
     assert flag in ['r', 'c']
     tdb = CompressedSqliteDict(DICT_DB_FILE, tablename='tags', flag=flag, autocommit=autocommit)
     return tdb
 
-def get_last_active_db(flag='r', autocommit=True):
+def get_last_active_db(flag='c', autocommit=True):
     assert flag in ['r', 'c']
     ladb = SqliteDict(DICT_DB_FILE, tablename='last_active', flag=flag, autocommit=autocommit)
     return ladb
 
-def get_email_db(flag='r', autocommit=True):
+def get_email_db(flag='c', autocommit=True):
     assert flag in ['r', 'c']
     edb = SqliteDict(DICT_DB_FILE, tablename='email', flag=flag, autocommit=autocommit)
     return edb

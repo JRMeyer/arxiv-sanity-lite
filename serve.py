@@ -43,6 +43,38 @@ app.secret_key = sk
 # -----------------------------------------------------------------------------
 # globals that manage the (lazy) loading of various state for a request
 
+def summarize_abstract(input_text):
+    ## Use a pipeline as a high-level helper
+    #from transformers import pipeline
+    #summarizer = pipeline("summarization", model="farleyknight-org-username/arxiv-summarization-t5-small")
+    #summary = summarizer(input_text)
+    zephyr_model_path="static/zephyr-7b-beta.Q5_K_M.gguf"
+
+    if not os.path.isfile(zephyr_model_path):
+        from huggingface_hub import hf_hub_download
+        print("I: Downloading Zephyr LLM")
+        hf_hub_download(repo_id="TheBloke/zephyr-7B-beta-GGUF", local_dir="static", filename="zephyr-7b-beta.Q5_K_M.gguf")
+
+    from llama_cpp import Llama
+    
+    llm_zephyr = Llama(model_path=zephyr_model_path,max_new_tokens=256, context_window=4096, n_ctx=4096,n_batch=128,verbose=False)
+    prompt = "<|system|>Summarize the following arxiv paper abstract as one sentence. Your response should be only one sentence. 20 words maximum. No longer. Your response starts with 'This paper is about'. Here is the abstract:</s> <|user|> Transformers have been successfully applied in the field of video-based 3D human pose estimation. However, the high computational costs of these video pose transformers (VPTs) make them impractical on resource-constrained devices. In this paper, we present a plug-and-play pruning-and-recovering framework, called Hourglass Tokenizer (HoT), for efficient transformer-based 3D human pose estimation from videos. Our HoT begins with pruning pose tokens of redundant frames and ends with recovering full-length tokens, resulting in a few pose tokens in the intermediate transformer blocks and thus improving the model efficiency. To effectively achieve this, we propose a token pruning cluster (TPC) that dynamically selects a few representative tokens with high semantic diversity while eliminating the redundancy of video frames. In addition, we develop a token recovering attention (TRA) to restore the detailed spatio-temporal information based on the selected tokens, thereby expanding the network output to the original full-length temporal resolution for fast inference. Extensive experiments on two benchmark datasets (i.e., Human3.6M and MPI-INF-3DHP) demonstrate that our method can achieve both high efficiency and estimation accuracy compared to the original VPT models. For instance, applying to MotionBERT and MixSTE on Human3.6M, our HoT can save nearly 50% FLOPs without sacrificing accuracy and nearly 40% FLOPs with only 0.2% accuracy drop, respectively. Our source code will be open-sourced. </s> <|assistant|> This paper introduces Hourglass Tokenizer (HoT), a pruning-and-recovering framework for efficient video-based 3D human pose estimation using transformers. HoT begins with pruning pose tokens of redundant frames, dynamically selects representative tokens with high semantic diversity through a token pruning cluster, and restores detailed spatio-temporal information through a token recovering attention for fast inference. Experiments on two datasets show improved efficiency and accuracy compared to original video pose transformer models. </s> <|user|> That's too long. Your output much only be one sentence long.</s> <|assistant|> Hourglass Tokenizer (HoT), a novel pruning-and-recovering framework for efficient transformer-based 3D human pose estimation from videos, dynamically selects representative tokens to eliminate redundancy and restores detailed spatio-temporal information through token recovering attention, achieving high accuracy and efficiency with significant FLOPs savings compared to original video pose transformers (VPTs) on benchmark datasets. </s> <|user|>That's still too long. Your response MUST be one sentence, no longer than 20 words. Don't include acronyms.</s> <|assistant|> This paper introduces a framework for efficient transformer-based 3D human pose estimation from video. It uses dynamic token selection and token recovering attention to eliminate redundancy and restore details. </s> <|user|> Perfect! Keep it simple. here's another one:" +input_text+ "</s> <|assistant|>"
+    output = llm_zephyr(prompt)
+    summary = output['choices'][0]['text']
+    return summary
+
+def run_tts(pid,text_input):
+    from TTS.api import TTS
+    tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+    # generate speech by cloning a voice using default settings
+    audio_path=f"static/audio/{pid}.wav"
+    tts.tts_to_file(text=text_input,
+                    speaker_wav=["/Users/josh/Downloads/roboqui.wav"],
+                    file_path="/Users/josh/arxiv-sanity-lite/"+audio_path,
+                    language="en")
+    return audio_path
+
+
 def get_tags():
     if g.user is None:
         return {}
@@ -90,6 +122,8 @@ def render_pid(pid):
     thumb_path = 'static/thumb/' + pid + '.jpg'
     thumb_url = thumb_path if os.path.isfile(thumb_path) else ''
     d = pdb[pid]
+    summarized = summarize_abstract(d['summary'])
+    audio_path = run_tts(pid,summarized)
     return dict(
         weight = 0.0,
         id = d['_id'],
@@ -100,6 +134,7 @@ def render_pid(pid):
         utags = [t for t, pids in tags.items() if pid in pids],
         summary = d['summary'],
         thumb_url = thumb_url,
+        audio_path = audio_path
     )
 
 def random_rank():
@@ -272,6 +307,7 @@ def main():
     scores = scores[start_index:end_index]
 
     # render all papers to just the information we need for the UI
+    pids=pids[:2]
     papers = [render_pid(pid) for pid in pids]
     for i, p in enumerate(papers):
         p['weight'] = float(scores[i])

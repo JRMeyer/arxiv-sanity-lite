@@ -4,3 +4,5 @@ __pycache__
 data
 *.ipynb
 secret_key.txt
+static/audio
+static/zephyr-7b-beta.Q5_K_M.gguf

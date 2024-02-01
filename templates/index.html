@@ -17,6 +17,20 @@ var move_page = function(int_offset) {
     queryParams.set("page_number", Math.max(1, parseInt(gvars.page_number) + int_offset));
     window.location.href = '/?' + queryParams.toString();
 }
+
+// Function to generate text-to-speech for a paper
+function generateTTS(pid) {
+    // Make an AJAX request to trigger text-to-speech generation
+    fetch(`/text_to_speech/${pid}`)
+        .then(response => response.json())
+        .then(data => {
+            // Handle the audio path, you can play the audio or do other actions
+            console.log(`Generated TTS audio path: ${data.audio_path}`);
+        })
+        .catch(error => {
+            console.error('[E]:', error);
+        });
+}
 </script>
 {% endblock %}
 
@@ -98,6 +112,16 @@ var move_page = function(int_offset) {
 
 <!-- main content showing all the papers as a list -->
 <div id="wrap">
+    {% for paper in papers %}
+    <div class="paper">
+        <h2>{{ paper.title }}</h2>
+        <p>Authors: {{ paper.authors }}</p>
+        <p>Tags: {{ paper.tags }}</p>
+        <p>{{ paper.summary }}</p>
+        <!-- Button for TTS generation -->
+        <button onclick="generateTTS('{{ paper.id }}')">Generate TTS</button>
+    </div>
+    {% endfor %}
 </div>
 
 <!-- links to previous and next pages -->

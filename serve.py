@@ -19,6 +19,7 @@ from flask import Flask, request, redirect, url_for
 from flask import render_template
 from flask import g # global session-level object
 from flask import session
+from flask import jsonify
 
 from aslite.db import get_papers_db, get_metas_db, get_tags_db, get_last_active_db, get_email_db
 from aslite.db import load_features
@@ -43,11 +44,7 @@ app.secret_key = sk
 # -----------------------------------------------------------------------------
 # globals that manage the (lazy) loading of various state for a request
 
-def summarize_abstract(input_text):
-    ## Use a pipeline as a high-level helper
-    #from transformers import pipeline
-    #summarizer = pipeline("summarization", model="farleyknight-org-username/arxiv-summarization-t5-small")
-    #summary = summarizer(input_text)
+def summarize_paper(input_text):
     zephyr_model_path="static/zephyr-7b-beta.Q5_K_M.gguf"
 
     if not os.path.isfile(zephyr_model_path):
@@ -73,7 +70,7 @@ def summarize_abstract(input_text):
     summary = output['choices'][0]['text']
     return summary
 
-def run_tts(pid,text_input):
+def generate_tts(pid,text_input):
     from TTS.api import TTS
     tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
     # generate speech by cloning a voice using default settings
@@ -83,7 +80,6 @@ def run_tts(pid,text_input):
                     file_path="/Users/josh/arxiv-sanity-lite/"+audio_path,
                     language="en")
     return audio_path
-
 
 def get_tags():
     if g.user is None:
@@ -107,7 +103,6 @@ def get_metas():
 @app.before_request
 def before_request():
     g.user = session.get('user', None)
-
     # record activity on this user so we can reserve periodic
     # recommendations heavy compute only for active users
     if g.user:
@@ -132,19 +127,23 @@ def render_pid(pid):
     thumb_path = 'static/thumb/' + pid + '.jpg'
     thumb_url = thumb_path if os.path.isfile(thumb_path) else ''
     d = pdb[pid]
-    summarized = summarize_abstract(d['summary'])
-    audio_path = run_tts(pid,summarized)
+    try:
+        summarized_text=d['summarized_text']
+    except:
+        summarized_text=""
     return dict(
-        weight = 0.0,
-        id = d['_id'],
-        title = d['title'],
-        time = d['_time_str'],
-        authors = ', '.join(a['name'] for a in d['authors']),
-        tags = ', '.join(t['term'] for t in d['tags']),
-        utags = [t for t, pids in tags.items() if pid in pids],
-        summary = d['summary'],
-        thumb_url = thumb_url,
-        audio_path = audio_path
+        weight=0.0,
+        id=d['_id'],
+        title=d['title'],
+        time=d['_time_str'],
+        authors=', '.join(a['name'] for a in d['authors']),
+        tags=', '.join(t['term'] for t in d['tags']),
+        utags=[t for t, pids in tags.items() if pid in pids],
+        summary=d['summary'],
+        thumb_url=thumb_url,
+        audio_path=f"static/audio/{pid}.wav",
+        summarized_text=summarized_text,
+        pid=pid  # add pid to identify the paper in the front-end
     )
 
 def random_rank():
@@ -317,7 +316,6 @@ def main():
     scores = scores[start_index:end_index]
 
     # render all papers to just the information we need for the UI
-    pids=pids[:2]
     papers = [render_pid(pid) for pid in pids]
     for i, p in enumerate(papers):
         p['weight'] = float(scores[i])
@@ -538,3 +536,38 @@ def register_email():
                 edb[g.user] = email
 
     return redirect(url_for('profile'))
+
+
+# Set up logging
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+# -----------------------------------------------------------------------------
+# New route for summarization
+@app.route('/summarize_paper/<pid>', methods=['POST'])
+def summarize_paper_route(pid):
+    # Fetch the paper summary based on the provided pid
+    with get_papers() as pdb:
+        if pid in pdb:
+            paper_summary = pdb[pid]['summary']
+            # Summarize the paper
+            summary = summarize_paper(paper_summary)
+            # Update database with summarized text
+            pdb[pid]['summarized_text'] = summary
+            return jsonify({'summarized_text': summary})
+        else:
+            return jsonify({'error': 'Paper with the provided PID not found'})
+
+# New route for summarization and text-to-speech
+@app.route('/text_to_speech/<pid>', methods=['POST', 'GET'])
+def generate_tts_route(pid):
+    # Fetch the paper summary based on the provided pid
+    pdb = get_papers()
+    if pid in pdb:
+        paper_summary = pdb[pid]['summarized_text']
+        print(paper_summary)
+        # Generate speech from the summary
+        audio_path = generate_tts(pid, paper_summary)
+        return jsonify({'audio_path': audio_path})
+    else:
+        return jsonify({'error': 'Paper with the provided PID not found'})

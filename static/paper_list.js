@@ -12,45 +12,88 @@ const UTag = props => {
     )
 }
 
+// Function to summarize the paper
+const summarizePaper = (paperId) => {
+    // Send a POST request to the summarize_paper route with the paper text
+    fetch("/summarize_paper/" + paperId, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            paper_text: "Replace this with the actual paper text" // Replace with the actual paper text
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Handle the summarized text response here
+        console.log(data.summarized_text);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+};
+
 const Paper = props => {
     const p = props.paper;
 
-    const adder = () => fetch("/add/" + p.id + "/" + prompt("tag to add to this paper:"))
-                        .then(response => console.log(response.text()));
-    const subber = () => fetch("/sub/" + p.id + "/" + prompt("tag to subtract from this paper:"))
-                        .then(response => console.log(response.text()));
-    const utags = p.utags.map((utxt, ix) => <UTag key={ix} tag={utxt} />);
-    const similar_url = "/?rank=pid&pid=" + p.id;
-    const inspect_url = "/inspect?pid=" + p.id;
-    const thumb_img = p.thumb_url === '' ? null : <div class='rel_img'><img src={p.thumb_url} /></div>;
-    // if the user is logged in then we can show add/sub buttons
-    let utag_controls = null;
-    if(user) {
-        utag_controls = (
-            <div class='rel_utags'>
-                <div class="rel_utag rel_utag_add" onClick={adder}>+</div>
-                <div class="rel_utag rel_utag_sub" onClick={subber}>-</div>
-                {utags}
-            </div>
-        )
-    }
+    // Function to generate text-to-speech for the paper
+    const generateTTSForPaper = () => {
+        generateTTS(p.id); // Call the generateTTS function with the paper ID
+    };
+
+    // Function to handle summarizing the paper
+    const summarizePaperForPaper = () => {
+        summarizePaper(p.id); // Call the summarizePaper function with the paper ID
+    };
+
+    // Function to add a tag to the paper
+    const addTagToPaper = () => {
+        fetch("/add/" + p.id + "/" + prompt("Tag to add to this paper:"))
+            .then(response => console.log(response.text()));
+    };
+
+    // Function to subtract a tag from the paper
+    const subtractTagFromPaper = () => {
+        fetch("/sub/" + p.id + "/" + prompt("Tag to subtract from this paper:"))
+            .then(response => console.log(response.text()));
+    };
+
+    // Render user tags
+    const userTags = p.utags.map((utxt, ix) => <UTag key={ix} tag={utxt} />);
+
+    // Render add/subtract tag controls if user is logged in
+    const tagControls = user ? (
+        <div className="rel_utags">
+            <div className="rel_utag rel_utag_add" onClick={addTagToPaper}>+</div>
+            <div className="rel_utag rel_utag_sub" onClick={subtractTagFromPaper}>-</div>
+            {userTags}
+        </div>
+    ) : null;
+
+    // Render thumbnail image if available
+    const thumbImg = p.thumb_url === '' ? null : <div className="rel_img"><img src={p.thumb_url} alt="Thumbnail" /></div>;
 
     return (
-    <div class='rel_paper'>
-        <div class="rel_score">{p.weight.toFixed(2)}</div>
-        <div class='rel_title'><a href={'http://arxiv.org/abs/' + p.id}>{p.title}</a></div>
-        <div class='rel_authors'>{p.authors}</div>
-        <div class="rel_time">{p.time}</div>
-        <div class='rel_tags'>{p.tags}</div>
-        {utag_controls}
-        {thumb_img}
-            <div class='rel_abs'>{p.summary}</div>
-	    <figure><audio controls src={p.audio_path} type="audio/wav"></audio></figure>
-        <div class='rel_more'><a href={similar_url}>similar</a></div>
-        <div class='rel_inspect'><a href={inspect_url}>inspect</a></div>
-    </div>
-    )
-}
+        <div className="rel_paper">
+            <div className="rel_score">{p.weight.toFixed(2)}</div>
+            <div className="rel_title"><a href={'http://arxiv.org/abs/' + p.id}>{p.title}</a></div>
+            <div className="rel_authors">{p.authors}</div>
+            <div className="rel_time">{p.time}</div>
+            <div className="rel_tags">{p.tags}</div>
+            {tagControls}
+            {thumbImg}
+            <div className="rel_abs">{p.summary}</div>
+	    <figure>
+	      <audio controls src={p.audio_path} type="audio/wav"></audio>
+	    </figure>
+	    <button onClick={summarizePaperForPaper}>Summarize Paper</button>
+            <button onClick={generateTTSForPaper}>Generate TTS</button>
+            <div className="rel_more"><a href={"/?rank=pid&pid=" + p.id}>Similar</a></div>
+            <div className="rel_inspect"><a href={"/inspect?pid=" + p.id}>Inspect</a></div>
+        </div>
+    );
+};
 
 const PaperList = props => {
     const lst = props.papers;

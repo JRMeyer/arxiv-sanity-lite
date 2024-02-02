@@ -44,43 +44,6 @@ app.secret_key = sk
 # -----------------------------------------------------------------------------
 # globals that manage the (lazy) loading of various state for a request
 
-def summarize_paper(input_text):
-    zephyr_model_path="static/zephyr-7b-beta.Q5_K_M.gguf"
-
-    if not os.path.isfile(zephyr_model_path):
-        from huggingface_hub import hf_hub_download
-        print("I: Downloading Zephyr LLM")
-        hf_hub_download(repo_id="TheBloke/zephyr-7B-beta-GGUF", local_dir="static", filename="zephyr-7b-beta.Q5_K_M.gguf")
-
-    from llama_cpp import Llama
-    
-    llm_zephyr = Llama(model_path=zephyr_model_path,max_new_tokens=256, context_window=4096, n_ctx=4096,n_batch=128,verbose=False)
-    prompt = """
-    <|system|> Hello. You are a computer science professor, and you see a colleague at a conference in the hallway. You're colleague's in a rush. You just read a new paper thought it was super interesting. Your colleague is in a rush, and has only 5 seconds to listen to you, but you really want to tell them about the paper. You must explain the paper in one sentence. Start by saying 'this paper is about...'</s>
-    <|user|> Here's the paper abstract: '''The goal of voice conversion (VC) is to convert input voice to match the target speaker's voice while keeping text and prosody intact. VC is usually used in entertainment and speaking-aid systems, as well as applied for speech data generation and augmentation. The development of any-to-any VC systems, which are capable of generating voices unseen during model training, is of particular interest to both researchers and the industry. Despite recent progress, any-to-any conversion quality is still inferior to natural speech. In this work, we propose a new any-to-any voice conversion pipeline. Our approach uses automated speech recognition (ASR) features, pitch tracking, and a state-of-the-art waveform prediction model. According to multiple subjective and objective evaluations, our method outperforms modern baselines in terms of voice quality, similarity and consistency.'''</s>
-    <|assistant|> This paper proposes a new pipeline for any-to-any voice conversion (VC) using ASR features, pitch tracking, and a state-of-the-art waveform prediction model, achieving better voice quality, similarity, and consistency than current baselines in subjective and objective evaluations.</s>
-    <|user|> Do not include any acronyms! Your output should be less than 200 characters long.</s>
-    <|assistant|> This paper proposes a pipeline for any-to-any voice conversion using speech recognition features, pitch tracking, and a waveform prediction model. It achieves better voice quality, similarity, and consistency than baselines in evaluations.</s>
-    <|user|> Your reply is too long! Your colleague is in a hurry and has only 5 seconds to listen to you!</s>
-        <|assistant|> This paper proposes a pipeline for any-to-any voice conversion using speech recognition features, pitch tracking, and waveform prediction. It shows excellent quality, similarity, and consistency!</s>
-    <|user|> Perfect! Here's another paper abstract: ''' {} '''</s>
-    <|assistant|>
-    """.format(input_text)
-    output = llm_zephyr(prompt)
-    summary = output['choices'][0]['text']
-    return summary
-
-def generate_tts(pid,text_input):
-    from TTS.api import TTS
-    tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
-    # generate speech by cloning a voice using default settings
-    audio_path=f"static/audio/{pid}.wav"
-    tts.tts_to_file(text=text_input,
-                    speaker_wav=["/Users/josh/Downloads/roboqui.wav"],
-                    file_path="/Users/josh/arxiv-sanity-lite/"+audio_path,
-                    language="en")
-    return audio_path
-
 def get_tags():
     if g.user is None:
         return {}
@@ -538,36 +501,73 @@ def register_email():
     return redirect(url_for('profile'))
 
 
-# Set up logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
+
+
+### SUMMARY AND AUDIO THINGS
+
+def summarize_paper(input_text):
+    prompt = """
+    <|system|> Hello. You are a computer science professor, and you see a colleague at a conference in the hallway. You're colleague's in a rush. You just read a new paper thought it was super interesting. Your colleague is in a rush, and has only 5 seconds to listen to you, but you really want to tell them about the paper. You must explain the paper in one sentence. Start by saying 'this paper is about...'</s>
+    <|user|> Here's the paper abstract: '''The goal of voice conversion (VC) is to convert input voice to match the target speaker's voice while keeping text and prosody intact. VC is usually used in entertainment and speaking-aid systems, as well as applied for speech data generation and augmentation. The development of any-to-any VC systems, which are capable of generating voices unseen during model training, is of particular interest to both researchers and the industry. Despite recent progress, any-to-any conversion quality is still inferior to natural speech. In this work, we propose a new any-to-any voice conversion pipeline. Our approach uses automated speech recognition (ASR) features, pitch tracking, and a state-of-the-art waveform prediction model. According to multiple subjective and objective evaluations, our method outperforms modern baselines in terms of voice quality, similarity and consistency.'''</s>
+    <|assistant|> This paper proposes a new pipeline for any-to-any voice conversion (VC) using ASR features, pitch tracking, and a state-of-the-art waveform prediction model, achieving better voice quality, similarity, and consistency than current baselines in subjective and objective evaluations.</s>
+    <|user|> Do not include any acronyms! Your output should be less than 200 characters long.</s>
+    <|assistant|> This paper proposes a pipeline for any-to-any voice conversion using speech recognition features, pitch tracking, and a waveform prediction model. It achieves better voice quality, similarity, and consistency than baselines in evaluations.</s>
+    <|user|> Your reply is too long! Your colleague is in a hurry and has only 5 seconds to listen to you!</s>
+        <|assistant|> This paper proposes a pipeline for any-to-any voice conversion using speech recognition features, pitch tracking, and waveform prediction. It shows excellent quality, similarity, and consistency!</s>
+    <|user|> Perfect! Here's another paper abstract: ''' {} '''</s>
+    <|assistant|>
+    """.format(input_text)
+
+    zephyr_model_path="static/zephyr-7b-beta.Q5_K_M.gguf"
+
+    if not os.path.isfile(zephyr_model_path):
+        from huggingface_hub import hf_hub_download
+        print("I: Downloading Zephyr LLM")
+        hf_hub_download(repo_id="TheBloke/zephyr-7B-beta-GGUF", local_dir="static", filename="zephyr-7b-beta.Q5_K_M.gguf")
+
+    from llama_cpp import Llama
+    
+    llm_zephyr = Llama(model_path=zephyr_model_path,max_new_tokens=256, context_window=4096, n_ctx=4096,n_batch=128,verbose=False)
+    output = llm_zephyr(prompt)
+    summary = output['choices'][0]['text']
+    return summary
+
+def generate_tts(pid,text_input):
+    from TTS.api import TTS
+    tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
+    # generate speech by cloning a voice using default settings
+    audio_path=f"static/audio/{pid}.wav"
+    tts.tts_to_file(text=text_input,
+                    speaker_wav=["/Users/josh/Downloads/roboqui.wav"],
+                    file_path="/Users/josh/arxiv-sanity-lite/"+audio_path,
+                    language="en")
+    return audio_path
 
 # -----------------------------------------------------------------------------
 # New route for summarization
-@app.route('/summarize_paper/<pid>', methods=['POST'])
+@app.route('/summarize_paper/<pid>', methods=['POST', 'GET'])
 def summarize_paper_route(pid):
-    # Fetch the paper summary based on the provided pid
-    with get_papers() as pdb:
-        if pid in pdb:
-            paper_summary = pdb[pid]['summary']
-            # Summarize the paper
-            summary = summarize_paper(paper_summary)
-            # Update database with summarized text
-            pdb[pid]['summarized_text'] = summary
-            return jsonify({'summarized_text': summary})
-        else:
-            return jsonify({'error': 'Paper with the provided PID not found'})
+    pdb = get_papers_db(flag='c', autocommit=True)
+    if pid in pdb:
+        # to update the paper dict, I have to delete it and then re-add it
+        paper = pdb[pid]
+        del pdb[pid]
+        llm_summary = summarize_paper(paper['summary'])
+        paper["llm_summary"] = llm_summary
+        pdb[pid] = paper
+        return jsonify({'llm_summary': llm_summary})
+    else:
+        return jsonify({'error': 'Paper with the provided PID not found'})
 
 # New route for summarization and text-to-speech
 @app.route('/text_to_speech/<pid>', methods=['POST', 'GET'])
 def generate_tts_route(pid):
     # Fetch the paper summary based on the provided pid
-    pdb = get_papers()
-    if pid in pdb:
-        paper_summary = pdb[pid]['summarized_text']
-        print(paper_summary)
-        # Generate speech from the summary
-        audio_path = generate_tts(pid, paper_summary)
-        return jsonify({'audio_path': audio_path})
-    else:
-        return jsonify({'error': 'Paper with the provided PID not found'})
+    with get_papers() as pdb:
+        if pid in pdb:
+            llm_summary = pdb[pid]['llm_summary']
+            # Generate speech from the summary
+            audio_path = generate_tts(pid, llm_summary)
+            return jsonify({'audio_path': audio_path})
+        else:
+            return jsonify({'error': 'Paper with the provided PID not found'})

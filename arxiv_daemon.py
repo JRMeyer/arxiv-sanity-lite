@@ -30,7 +30,21 @@ if __name__ == '__main__':
     """
 
     # query string of papers to look for
-    q = 'cat:cs.CV+OR+cat:cs.LG+OR+cat:cs.CL+OR+cat:cs.AI+OR+cat:cs.NE+OR+cat:cs.RO'
+    q_categories = ['eess.IV', # Image and Video Proc
+                    'eess.AS', # Audio and Speech Proc
+                    'cs.AI', # AI
+                    'cs.CL', # Computation and Lang
+                    'cs.CV', # CompVis / Pattern Rec
+                    'cs.HC', # HCI
+                    'cs.LG', # Machine Learning
+                    'cs.NE', # Neural and Evolutionary Comp
+                    'cs.RO', # Robotics
+                    ]
+
+    def combine_categories(categories):
+        return '+OR+'.join(['cat:' + category for category in categories])
+
+    q = combine_categories(q_categories)
 
     pdb = get_papers_db(flag='c')
     mdb = get_metas_db(flag='c')
